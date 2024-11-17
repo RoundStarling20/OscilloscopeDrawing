@@ -1,0 +1,17 @@
+0: OPEN Developer PowerShell for VS 2019
+1: Need to clone pico sdk into directory at same level as projects using it
+    git clone -b master https://github.com/raspberrypi/pico-sdk.git
+    cd pico-sdk
+    git submodule update --init
+    cd..
+2: Clone repo you want to build to this level
+
+These can change depending on their install locations
+3: setx PICO_SDK_PATH "..\..\pico-sdk"
+4: setx PICO_TOOLCHAIN_PATH "C:\Program Files (x86)\GNU Arm Embedded Toolchain\10 2021.10\"
+
+Restart Developer PowerShell for VS 2019 for these changes to take effect
+
+Navigate to build folder, open a command prompt window in this directory
+cmake -G "NMake Makefiles" ..
+nmake

@@ -1,14 +1,12 @@
 // Include necessary libraries
-#include <stdio.h>
-#include <math.h>
-#include <string.h>
+#include <stdint.h>
 #include "pico/stdlib.h"
-#include "pico/multicore.h"
 #include "hardware/spi.h"
-#include "hardware/sync.h"
 
-void LEDConfig();
 void spiConfig();
+void drawLine(int16_t x1, int16_t x2, int16_t y1, int16_t y2);
+
+#define abs(a) ((a>0) ? a:-a) //if a greater than 0, return a else return negative a
 
 // SPI data
 uint16_t DAC_data_0 ; // output value
@@ -24,14 +22,10 @@ uint16_t DAC_data_0 ; // output value
 #define PIN_SCK  6
 #define PIN_MOSI 7 //SDI
 #define LDAC     8
-#define LED      25
 #define SPI_PORT spi0
 
 // Core 0 entry point
 int main() {
-    // Initialize stdio/uart (printf won't work unless you do this!)
-    stdio_init_all();
-
     spiConfig();
 
     // // Map LDAC pin to GPIO port, hold it low (could alternatively tie to GND)
@@ -39,45 +33,20 @@ int main() {
     gpio_set_dir(LDAC, GPIO_OUT) ;
     gpio_put(LDAC, 0) ;
 
-    LEDConfig();
-
-    #define MAXVoltage 2.5
-    #define STEPS 1<<8
-    uint16_t xPos; 
-    uint i;
-    bool direction = 0;
-
     while (1) {
-        //xPos = 0;
-        for (i = 0; i < STEPS-1; ++i) {
-            if (direction == 0) {
-                ++xPos;
-            } else {
-                --xPos;
-            }
-            //++xPos; //Line starting a 0, incrementing by 5/1000, to 5
-            // Mask with DAC control bits
-            DAC_data_0 = (DAC_config_chan_A | (xPos << 4 & 0x0fff))  ;
-            // SPI write (no spinlock b/c of SPI buffer)
-            spi_write16_blocking(SPI_PORT, &DAC_data_0, 1) ;
+        drawLine(0,255,255,0);
+        drawLine(255,0,255,0);
 
-            DAC_data_0 = (DAC_config_chan_B | (xPos << 4 & 0x0fff))  ;
-            // SPI write (no spinlock b/c of SPI buffer)
-            spi_write16_blocking(SPI_PORT, &DAC_data_0, 1) ;
-        }
-        //sleep_ms(100);
-        direction = !direction;
+        drawLine(0,255/4,255 - (255/4), 255);
+        drawLine(255 - (255/4),255,  255, 255 - (255/4));
+
+        drawLine(0,255/4, 255/4,0);
+        drawLine(255-(255/4),255,0,255/4);
+
+        //drawLine(0,255,0,64); //just to show fractional slope works
     }
 }
 
-
-void LEDConfig() {
-    // Map LED to GPIO port, make it low
-    gpio_init(LED) ;
-    gpio_set_dir(LED, GPIO_OUT) ;
-    gpio_put(LED, 0) ;
-    
-}
 
 void spiConfig() {
     // Initialize SPI channel (channel, baud rate set to 20MHz)
@@ -90,4 +59,25 @@ void spiConfig() {
     gpio_set_function(PIN_SCK, GPIO_FUNC_SPI);
     gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
     gpio_set_function(PIN_CS, GPIO_FUNC_SPI) ;
+}
+
+
+void drawLine(int16_t x1, int16_t x2, int16_t y1, int16_t y2) {
+    int16_t xCount = (x2 - x1); //Number of times we can increase the voltage to get from one point to next
+    float m = (float)(y2 - y1)/ (float)xCount; //slope
+    int16_t x = x1;
+    int16_t i;
+    float y;
+
+    for(i = 0; i <= abs(xCount); ++i){
+        x = (x2 < x1) ? x-1 : x+1;
+        DAC_data_0 = (DAC_config_chan_A | ((uint16_t)x << 4 & 0x0fff))  ;
+        // SPI write (no spinlock b/c of SPI buffer)
+        spi_write16_blocking(SPI_PORT, &DAC_data_0, 1) ;
+        
+        y = m*((float)x - (float)x1) + (float)y1;
+        DAC_data_0 = (DAC_config_chan_B | (( (uint16_t)y << 4) & 0x0fff))  ;
+        // SPI write (no spinlock b/c of SPI buffer)
+        spi_write16_blocking(SPI_PORT, &DAC_data_0, 1);
+    }
 }

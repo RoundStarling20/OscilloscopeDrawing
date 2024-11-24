@@ -13,8 +13,8 @@ uint16_t DAC_data_0 ; // output value
 
 // DAC parameters (see the DAC datasheet)
 // B-channel, 1x, active
-#define DAC_config_chan_A 0b0011000000000000
-#define DAC_config_chan_B 0b1011000000000000
+#define DAC_config_X_OUTPUT 0b0011000000000000
+#define DAC_config_Y_OUTPUT 0b1011000000000000
 
 //SPI configurations (note these represent GPIO number, NOT pin number)
 #define PIN_MISO 4
@@ -71,12 +71,12 @@ void drawLine(int16_t x1, int16_t x2, int16_t y1, int16_t y2) {
 
     for(i = 0; i <= abs(xCount); ++i){
         x = (x2 < x1) ? x-1 : x+1;
-        DAC_data_0 = (DAC_config_chan_A | ((uint16_t)x << 4 & 0x0fff))  ;
+        DAC_data_0 = (DAC_config_X_OUTPUT | ((uint16_t)x << 4 & 0x0fff))  ;
         // SPI write (no spinlock b/c of SPI buffer)
         spi_write16_blocking(SPI_PORT, &DAC_data_0, 1) ;
         
         y = m*((float)x - (float)x1) + (float)y1;
-        DAC_data_0 = (DAC_config_chan_B | (( (uint16_t)y << 4) & 0x0fff))  ;
+        DAC_data_0 = (DAC_config_Y_OUTPUT | (( (uint16_t)y << 4) & 0x0fff))  ;
         // SPI write (no spinlock b/c of SPI buffer)
         spi_write16_blocking(SPI_PORT, &DAC_data_0, 1);
     }

@@ -5,8 +5,12 @@
 #include "math.h"
 
 void spiConfig();
-void drawLine(int16_t x1, int16_t x2, int16_t y1, int16_t y2);
+void drawSlopeLine(int16_t x1, int16_t x2, int16_t y1, int16_t y2);
 void drawCircle(uint64_t x0, uint64_t y0, uint64_t r);
+void drawHLine(uint16_t x1, uint16_t x2, uint16_t y);
+void drawVLine(uint16_t y1, uint16_t y2, uint16_t x);
+void drawRectangle(uint16_t x1, uint16_t x2, uint16_t y1, uint16_t y2);
+
 
 #define abs(a) ((a>0) ? a:-a) //if a greater than 0, return a else return negative a
 
@@ -36,18 +40,23 @@ int main() {
     gpio_put(LDAC, 0) ;
 
     while (1) {
-        drawLine(0,255,255,0);
-        drawLine(255,0,255,0);
+        drawSlopeLine(0,255,255,0);
+        drawSlopeLine(255,0,255,0);
 
-        drawLine(0,255/4,255 - (255/4), 255);
-        drawLine(255 - (255/4),255,  255, 255 - (255/4));
+        drawSlopeLine(0,255/4,255 - (255/4), 255);
+        drawSlopeLine(255 - (255/4),255,  255, 255 - (255/4));
 
-        drawLine(0,255/4, 255/4,0);
-        drawLine(255-(255/4),255,0,255/4);
+        drawSlopeLine(0,255/4, 255/4,0);
+        drawSlopeLine(255-(255/4),255,0,255/4);
 
         //drawLine(0,255,0,64); //just to show fractional slope works
 
         drawCircle(255/2,255/2, 50);
+
+        drawHLine(0, 255, 255/2);
+        drawVLine(0,255,255/2);
+
+        drawRectangle(0,255,0,255);
     }
 }
 
@@ -66,7 +75,7 @@ void spiConfig() {
 }
 
 
-void drawLine(int16_t x1, int16_t x2, int16_t y1, int16_t y2) {
+void drawSlopeLine(int16_t x1, int16_t x2, int16_t y1, int16_t y2) {
     int16_t xCount = (x2 - x1); //Number of times we can increase the voltage to get from one point to next
     float m = (float)(y2 - y1)/ (float)xCount; //slope
     int16_t x = x1;
@@ -75,7 +84,7 @@ void drawLine(int16_t x1, int16_t x2, int16_t y1, int16_t y2) {
 
     for(i = 0; i <= abs(xCount); ++i){
         x = (x2 < x1) ? x-1 : x+1;
-        DAC_data_0 = (DAC_config_X_OUTPUT | ((uint16_t)x << 4 & 0x0fff))  ;
+        DAC_data_0 = (DAC_config_X_OUTPUT | (x << 4 & 0x0fff))  ;
         // SPI write (no spinlock b/c of SPI buffer)
         spi_write16_blocking(SPI_PORT, &DAC_data_0, 1) ;
         
@@ -91,7 +100,7 @@ void drawCircle(uint64_t x0, uint64_t y0, uint64_t r) {
     float y;
 
     for(x = x0-r; x < x0 + r; ++x) {
-        DAC_data_0 = (DAC_config_X_OUTPUT | ((uint16_t)x << 4 & 0x0fff))  ;
+        DAC_data_0 = (DAC_config_X_OUTPUT | (x << 4 & 0x0fff))  ;
         // SPI write (no spinlock b/c of SPI buffer)
         spi_write16_blocking(SPI_PORT, &DAC_data_0, 1) ;
         y = sqrt( (double)( r*r - (x - x0)*(x-x0))); //leave out y0 to avoid recomputing this
@@ -103,4 +112,45 @@ void drawCircle(uint64_t x0, uint64_t y0, uint64_t r) {
         // SPI write (no spinlock b/c of SPI buffer)
         spi_write16_blocking(SPI_PORT, &DAC_data_0, 1);
     }
+}
+
+void drawHLine(uint16_t x1, uint16_t x2, uint16_t y) {
+    int16_t distance = x1 - x2;
+    uint16_t i;
+    uint16_t x;
+    for(i = 0; i < abs(distance); ++i) {
+        x = (x2 < x1) ? x-1 : x+1;
+        DAC_data_0 = (DAC_config_X_OUTPUT | (x << 4 & 0x0fff))  ;
+        // SPI write (no spinlock b/c of SPI buffer)
+        spi_write16_blocking(SPI_PORT, &DAC_data_0, 1) ;
+
+        DAC_data_0 = (DAC_config_Y_OUTPUT | (y << 4 & 0x0fff))  ;
+        // SPI write (no spinlock b/c of SPI buffer)
+        spi_write16_blocking(SPI_PORT, &DAC_data_0, 1);
+    }
+
+}
+
+void drawVLine(uint16_t y1, uint16_t y2, uint16_t x) {
+    int16_t distance = y1 - y2;
+    uint16_t i;
+    uint16_t y;
+    for(i = 0; i < abs(distance); ++i) {
+        DAC_data_0 = (DAC_config_X_OUTPUT | (x << 4 & 0x0fff))  ;
+        // SPI write (no spinlock b/c of SPI buffer)
+        spi_write16_blocking(SPI_PORT, &DAC_data_0, 1) ;
+        
+        y = (y2 < y1) ? y-1 : y+1;
+        DAC_data_0 = (DAC_config_Y_OUTPUT | (y << 4 & 0x0fff))  ;
+        // SPI write (no spinlock b/c of SPI buffer)
+        spi_write16_blocking(SPI_PORT, &DAC_data_0, 1);
+    }
+
+}
+
+void drawRectangle(uint16_t x1, uint16_t x2, uint16_t y1, uint16_t y2) {
+    drawVLine(y1, y2, x1);
+    drawVLine(y1, y2, x2);
+    drawHLine(x1,x2,y1);
+    drawHLine(x1,x2,y2);
 }

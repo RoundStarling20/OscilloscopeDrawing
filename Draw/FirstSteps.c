@@ -2,9 +2,11 @@
 #include <stdint.h>
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
+#include "math.h"
 
 void spiConfig();
 void drawLine(int16_t x1, int16_t x2, int16_t y1, int16_t y2);
+void drawCircle(uint64_t x0, uint64_t y0, uint64_t r);
 
 #define abs(a) ((a>0) ? a:-a) //if a greater than 0, return a else return negative a
 
@@ -44,6 +46,8 @@ int main() {
         drawLine(255-(255/4),255,0,255/4);
 
         //drawLine(0,255,0,64); //just to show fractional slope works
+
+        drawCircle(255/2,255/2, 50);
     }
 }
 
@@ -77,6 +81,25 @@ void drawLine(int16_t x1, int16_t x2, int16_t y1, int16_t y2) {
         
         y = m*((float)x - (float)x1) + (float)y1;
         DAC_data_0 = (DAC_config_Y_OUTPUT | (( (uint16_t)y << 4) & 0x0fff))  ;
+        // SPI write (no spinlock b/c of SPI buffer)
+        spi_write16_blocking(SPI_PORT, &DAC_data_0, 1);
+    }
+}
+
+void drawCircle(uint64_t x0, uint64_t y0, uint64_t r) {
+    uint16_t x;
+    float y;
+
+    for(x = x0-r; x < x0 + r; ++x) {
+        DAC_data_0 = (DAC_config_X_OUTPUT | ((uint16_t)x << 4 & 0x0fff))  ;
+        // SPI write (no spinlock b/c of SPI buffer)
+        spi_write16_blocking(SPI_PORT, &DAC_data_0, 1) ;
+        y = sqrt( (double)( r*r - (x - x0)*(x-x0))); //leave out y0 to avoid recomputing this
+        DAC_data_0 = (DAC_config_Y_OUTPUT | (( (uint16_t)(y + y0) << 4) & 0x0fff));
+        // SPI write (no spinlock b/c of SPI buffer)
+        spi_write16_blocking(SPI_PORT, &DAC_data_0, 1);
+
+        DAC_data_0 = (DAC_config_Y_OUTPUT | (( (uint16_t)(-y + y0) << 4) & 0x0fff));
         // SPI write (no spinlock b/c of SPI buffer)
         spi_write16_blocking(SPI_PORT, &DAC_data_0, 1);
     }
